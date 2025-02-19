@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+
+set -eou pipefail
+# set -x
+
+WGET_OUTPUT="-q --show-progress"
+
+install_lazygit() {
+	echo -e "\n\tInstalling Lazygit"
+	old_version=""
+	if [[ $(command -v lazygit) ]]; then
+		old_version=$(lazygit --version 2>/dev/null | grep -oP 'version=\K[0-9.]+' | head -1)
+	fi
+	latest_version=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep -Po '"tag_name": *"v\K[^"]*')
+	if [[ ${old_version} == ${latest_version} ]]; then
+		echo "Already update"
+		return 0
+	fi
+	bin_file="lazygit"
+	tar_file="lazygit.tar.gz"
+	cd /tmp
+	echo "Downloading latest version (v${latest_version})"
+	wget ${WGET_OUTPUT} -O ${tar_file} \
+		"https://github.com/jesseduffield/lazygit/releases/download/v${latest_version}/lazygit_${latest_version}_Linux_x86_64.tar.gz"
+	echo "Extract ${tar_file}"
+	tar xf ${tar_file} ${bin_file}
+	echo "Installing lazygit"
+	install ${bin_file} -D -t $HOME/.local/bin
+}
+
+install_nvim() {
+	echo -e "\n\tInstalling Neovim"
+	sudo apt install npm python3-full
+	if [[ ! $(command -v nvim) ]]; then
+		old_version=""
+	else
+		old_version=$(nvim --version 2>/dev/null | grep -oP 'v\K[0-9.]+' | head -1)
+	fi
+	latest_version=$(curl -s "https://api.github.com/repos/neovim/neovim/releases/latest" | grep -Po '"tag_name": *"v\K[^"]*')
+	if [[ ${old_version} == ${latest_version} ]]; then
+		echo "Already update"
+		return 0
+	fi
+	cd /tmp
+	folder_name="nvim-linux-x86_64"
+	tar_file="/tmp/${folder_name}.tar.gz"
+	folders=("bin" "lib" "share")
+	wget ${WGET_OUTPUT} -O ${tar_file} \
+		https://github.com/neovim/neovim/releases/latest/download/${folder_name}.tar.gz
+	tar -xzf ${tar_file}
+	for dir in "${folders[@]}"; do
+		cp -R ${folder_name}/${dir}/* $HOME/.local/${dir}
+	done
+}
+
+PACKGES="tree git make gh tmux tar curl wget unzip"
+
+echo -e "\tInstalling PACKGES: ${PACKGES}"
+sudo apt install ${PACKGES}
+
+LOCAL_FOLDERS=(bin share state lib)
+for dir in "${LOCAL_FOLDERS[@]}"; do
+	dir=$HOME/.local/${dir}
+	[[ -d ${dir} ]] && continue
+
+	echo "Creating ${dir}"
+	mkdir -p ${dir}
+done
+
+install_lazygit
+install_nvim
